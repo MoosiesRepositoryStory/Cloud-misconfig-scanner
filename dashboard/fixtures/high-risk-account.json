@@ -1,0 +1,203 @@
+{
+  "account_id": "444455556666",
+  "s3": {
+    "list_buckets": {
+      "Buckets": [
+        { "Name": "public-uploads" },
+        { "Name": "customer-data" },
+        { "Name": "backup-dumps" }
+      ]
+    },
+    "buckets": {
+      "public-uploads": {
+        "get_bucket_policy_status": { "PolicyStatus": { "IsPublic": true } },
+        "get_bucket_acl": {
+          "Grants": [
+            {
+              "Grantee": { "Type": "Group", "URI": "http://acs.amazonaws.com/groups/global/AllUsers" },
+              "Permission": "READ"
+            },
+            {
+              "Grantee": { "Type": "Group", "URI": "http://acs.amazonaws.com/groups/global/AllUsers" },
+              "Permission": "WRITE"
+            }
+          ]
+        },
+        "get_bucket_policy": {
+          "Policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"PublicReadWrite\",\"Effect\":\"Allow\",\"Principal\":\"*\",\"Action\":[\"s3:GetObject\",\"s3:PutObject\"],\"Resource\":\"arn:aws:s3:::public-uploads/*\"}]}"
+        },
+        "get_public_access_block": {
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": false,
+            "IgnorePublicAcls": false,
+            "BlockPublicPolicy": false,
+            "RestrictPublicBuckets": false
+          }
+        },
+        "get_bucket_encryption": {
+          "Error": {
+            "Code": "ServerSideEncryptionConfigurationNotFoundError",
+            "Message": "No server-side encryption configuration found."
+          }
+        }
+      },
+      "customer-data": {
+        "get_bucket_policy_status": { "PolicyStatus": { "IsPublic": false } },
+        "get_bucket_acl": { "Grants": [] },
+        "get_bucket_policy": { "Error": { "Code": "NoSuchBucketPolicy" } },
+        "get_public_access_block": {
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": true,
+            "IgnorePublicAcls": true,
+            "BlockPublicPolicy": false,
+            "RestrictPublicBuckets": false
+          }
+        },
+        "get_bucket_encryption": {
+          "Error": {
+            "Code": "ServerSideEncryptionConfigurationNotFoundError",
+            "Message": "No server-side encryption configuration found."
+          }
+        }
+      },
+      "backup-dumps": {
+        "get_bucket_policy_status": { "PolicyStatus": { "IsPublic": false } },
+        "get_bucket_acl": {
+          "Grants": [
+            {
+              "Grantee": { "Type": "Group", "URI": "http://acs.amazonaws.com/groups/global/AuthenticatedUsers" },
+              "Permission": "READ"
+            }
+          ]
+        },
+        "get_bucket_policy": { "Error": { "Code": "NoSuchBucketPolicy" } },
+        "get_public_access_block": {
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": true,
+            "IgnorePublicAcls": true,
+            "BlockPublicPolicy": true,
+            "RestrictPublicBuckets": true
+          }
+        },
+        "get_bucket_encryption": {
+          "ServerSideEncryptionConfiguration": {
+            "Rules": [{ "ApplyServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" } }]
+          }
+        }
+      }
+    }
+  },
+  "iam": {
+    "users": [
+      {
+        "UserName": "legacy-admin",
+        "AttachedPolicies": [
+          {
+            "PolicyName": "FullAdminAccess",
+            "PolicyArn": "arn:aws:iam::444455556666:policy/FullAdminAccess"
+          }
+        ],
+        "InlinePolicies": {}
+      },
+      {
+        "UserName": "ci-deploy-bot",
+        "AttachedPolicies": [],
+        "InlinePolicies": {
+          "DeployAndPassRole": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PassAnyRole",
+                "Effect": "Allow",
+                "Action": ["iam:PassRole", "lambda:CreateFunction", "lambda:UpdateFunctionCode"],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groups": [
+      {
+        "GroupName": "contractors",
+        "AttachedPolicies": [],
+        "InlinePolicies": {
+          "AlmostEverything": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "BroadNotAction",
+                "Effect": "Allow",
+                "NotAction": ["organizations:DeleteOrganization"],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "roles": [
+      {
+        "RoleName": "cross-account-open-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "AttachedPolicies": [],
+        "InlinePolicies": {}
+      },
+      {
+        "RoleName": "data-pipeline-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "lambda.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "AttachedPolicies": [],
+        "InlinePolicies": {
+          "WideS3Access": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "S3Wildcard",
+                "Effect": "Allow",
+                "Action": ["s3:*"],
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "policies": {
+      "arn:aws:iam::444455556666:policy/FullAdminAccess": {
+        "PolicyName": "FullAdminAccess",
+        "DefaultVersionId": "v1",
+        "Versions": {
+          "v1": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "AdminWildcard",
+                "Effect": "Allow",
+                "Action": "*",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

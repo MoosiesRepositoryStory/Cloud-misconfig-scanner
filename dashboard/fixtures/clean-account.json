@@ -1,0 +1,101 @@
+{
+  "account_id": "111122223333",
+  "s3": {
+    "list_buckets": {
+      "Buckets": [
+        { "Name": "app-assets-prod" },
+        { "Name": "audit-logs-archive" }
+      ]
+    },
+    "buckets": {
+      "app-assets-prod": {
+        "get_bucket_policy_status": { "PolicyStatus": { "IsPublic": false } },
+        "get_bucket_acl": { "Grants": [] },
+        "get_bucket_policy": { "Error": { "Code": "NoSuchBucketPolicy" } },
+        "get_public_access_block": {
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": true,
+            "IgnorePublicAcls": true,
+            "BlockPublicPolicy": true,
+            "RestrictPublicBuckets": true
+          }
+        },
+        "get_bucket_encryption": {
+          "ServerSideEncryptionConfiguration": {
+            "Rules": [{ "ApplyServerSideEncryptionByDefault": { "SSEAlgorithm": "aws:kms" } }]
+          }
+        }
+      },
+      "audit-logs-archive": {
+        "get_bucket_policy_status": { "PolicyStatus": { "IsPublic": false } },
+        "get_bucket_acl": { "Grants": [] },
+        "get_bucket_policy": { "Error": { "Code": "NoSuchBucketPolicy" } },
+        "get_public_access_block": {
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": true,
+            "IgnorePublicAcls": true,
+            "BlockPublicPolicy": true,
+            "RestrictPublicBuckets": true
+          }
+        },
+        "get_bucket_encryption": {
+          "ServerSideEncryptionConfiguration": {
+            "Rules": [{ "ApplyServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" } }]
+          }
+        }
+      }
+    }
+  },
+  "iam": {
+    "users": [
+      {
+        "UserName": "app-service",
+        "AttachedPolicies": [],
+        "InlinePolicies": {
+          "ReadOnlyAppAssets": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "ReadAssets",
+                "Effect": "Allow",
+                "Action": ["s3:GetObject", "s3:ListBucket"],
+                "Resource": ["arn:aws:s3:::app-assets-prod", "arn:aws:s3:::app-assets-prod/*"]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groups": [],
+    "roles": [
+      {
+        "RoleName": "ci-deploy-role",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "AWS": "arn:aws:iam::111122223333:root" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "AttachedPolicies": [],
+        "InlinePolicies": {
+          "DeployToOneBucket": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "DeployAssets",
+                "Effect": "Allow",
+                "Action": ["s3:PutObject"],
+                "Resource": "arn:aws:s3:::app-assets-prod/*"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "policies": {}
+  }
+}

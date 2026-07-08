@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cloud Misconfiguration Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --crit: #dc2626; --high: #ea580c; --med: #ca8a04; --low: #65a30d;
+    --bg: #0f172a; --panel: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text); padding: 24px;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 0.9rem; }
+  .controls {
+    display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  select, button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; font-size: 0.9rem;
+  }
+  button { cursor: pointer; }
+  button.primary { background: #2563eb; border-color: #2563eb; font-weight: 600; }
+  button.primary:hover { background: #1d4ed8; }
+  button:hover { background: #334155; }
+  .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 18px; min-width: 110px;
+  }
+  .card .n { font-size: 1.6rem; font-weight: 700; }
+  .card .l { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .card.CRITICAL .n { color: var(--crit); }
+  .card.HIGH .n { color: var(--high); }
+  .card.MEDIUM .n { color: var(--med); }
+  .card.LOW .n { color: var(--low); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover { background: #24304a; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem;
+    font-weight: 700; color: #fff;
+  }
+  .badge.CRITICAL { background: var(--crit); }
+  .badge.HIGH { background: var(--high); }
+  .badge.MEDIUM { background: var(--med); }
+  .badge.LOW { background: var(--low); }
+  .empty { text-align: center; padding: 40px; color: var(--muted); }
+  .desc { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+  .resource { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  footer { margin-top: 24px; color: var(--muted); font-size: 0.75rem; }
+</style>
+</head>
+<body>
+  <h1>Cloud Misconfiguration Scanner</h1>
+  <p class="subtitle">Read-only S3 + IAM checks against Boto3-shaped JSON fixtures. No AWS credentials required for this demo.</p>
+
+  <div class="controls">
+    <select id="fixtureSelect">
+      {% for fx in fixtures %}
+        <option value="{{ fx.id }}">{{ fx.label }}</option>
+      {% endfor %}
+    </select>
+    <button class="primary" id="scanBtn">Run Scan</button>
+    <select id="severityFilter">
+      <option value="ALL">All severities</option>
+      <option value="CRITICAL">Critical only</option>
+      <option value="HIGH">High only</option>
+      <option value="MEDIUM">Medium only</option>
+      <option value="LOW">Low only</option>
+    </select>
+    <button id="exportJson">Export JSON</button>
+    <button id="exportCsv">Export CSV</button>
+  </div>
+
+  <div class="summary" id="summary"></div>
+  <div id="results"></div>
+
+  <footer>Checks: S3 public policy/ACL, public access block, default encryption &middot; IAM admin wildcards, service wildcards, privilege escalation, public trust policies.</footer>
+
+<script>
+let currentFindings = [];
+
+async function loadFixtures() {
+  // fixtures already rendered server-side; nothing to do here.
+}
+
+async function runScan() {
+  const fixture = document.getElementById('fixtureSelect').value;
+  const resultsEl = document.getElementById('results');
+  resultsEl.innerHTML = '<div class="empty">Scanning...</div>';
+  const res = await fetch(`/api/scan?fixture=${encodeURIComponent(fixture)}`);
+  const data = await res.json();
+  if (data.error) {
+    resultsEl.innerHTML = `<div class="empty">${data.error}</div>`;
+    return;
+  }
+  currentFindings = data.findings;
+  renderSummary(data.summary);
+  renderTable();
+}
+
+function renderSummary(summary) {
+  const el = document.getElementById('summary');
+  const order = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+  el.innerHTML = order.map(sev => `
+    <div class="card ${sev}">
+      <div class="n">${summary[sev] || 0}</div>
+      <div class="l">${sev}</div>
+    </div>
+  `).join('');
+}
+
+function renderTable() {
+  const filter = document.getElementById('severityFilter').value;
+  const rows = filter === 'ALL' ? currentFindings : currentFindings.filter(f => f.severity === filter);
+  const resultsEl = document.getElementById('results');
+
+  if (rows.length === 0) {
+    resultsEl.innerHTML = '<div class="empty">No findings for this filter. 🎉</div>';
+    return;
+  }
+
+  resultsEl.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Severity</th><th>Service</th><th>Resource</th><th>Finding</th></tr>
+      </thead>
+      <tbody>
+        ${rows.map(f => `
+          <tr>
+            <td><span class="badge ${f.severity}">${f.severity}</span></td>
+            <td>${f.service}</td>
+            <td class="resource">${f.resource}</td>
+            <td>
+              <div>${f.title}</div>
+              <div class="desc">${f.description}</div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function exportJson() {
+  const blob = new Blob([JSON.stringify(currentFindings, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'findings.json');
+}
+
+function exportCsv() {
+  const headers = ['severity', 'service', 'resource', 'check_id', 'title', 'description'];
+  const lines = [headers.join(',')];
+  for (const f of currentFindings) {
+    lines.push(headers.map(h => `"${String(f[h] ?? '').replace(/"/g, '""')}"`).join(','));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  downloadBlob(blob, 'findings.csv');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('scanBtn').addEventListener('click', runScan);
+document.getElementById('severityFilter').addEventListener('change', renderTable);
+document.getElementById('exportJson').addEventListener('click', exportJson);
+document.getElementById('exportCsv').addEventListener('click', exportCsv);
+
+runScan();
+</script>
+</body>
+</html>
