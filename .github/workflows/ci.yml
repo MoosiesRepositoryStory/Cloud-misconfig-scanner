@@ -23,5 +23,17 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests
 
-      - name: Fail build on HIGH-or-above findings
-        run: python -m cloud_misconfig_scanner --fixture examples/aws_responses.sample.json --fail-on HIGH
+      - name: Confirm HIGH-or-above gate triggers
+        run: |
+          set +e
+          python -m cloud_misconfig_scanner --fixture examples/aws_responses.sample.json --fail-on HIGH
+          exit_code=$?
+          set -e
+
+          if [ "$exit_code" -eq 2 ]; then
+            echo "Scanner gate triggered as expected for HIGH-or-above findings."
+            exit 0
+          fi
+
+          echo "Expected scanner gate to exit 2, but got $exit_code."
+          exit 1
