@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Cloud Misconfiguration Scanner</title>
+<title>LoudCloudProblems</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.ico" sizes="any">
 <style>
   :root {
     /* Severity colors are functional, not decorative — left untouched by the theme. */
@@ -64,7 +65,62 @@
   .empty { text-align: center; padding: 40px; color: var(--muted); }
   .desc { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
   .resource { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .finding-line { display: flex; gap: 8px; align-items: flex-start; }
+  .finding-copy { flex: 1; min-width: 0; }
+  .info-btn {
+    width: 24px; height: 24px; padding: 0; flex: 0 0 auto; border-radius: 999px;
+    font-weight: 800; line-height: 1; text-align: center;
+  }
   footer { margin-top: 24px; color: var(--muted); font-size: 0.75rem; }
+  .resource-row { cursor: context-menu; }
+  .resource-row.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .context-menu {
+    position: fixed; z-index: 20; min-width: 210px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 12px 30px rgba(31, 42, 36, 0.16);
+    padding: 6px; display: none;
+  }
+  .context-menu.open { display: block; }
+  .context-menu button {
+    width: 100%; display: block; border: 0; border-radius: 6px; background: transparent;
+    text-align: left; padding: 8px 10px;
+  }
+  .context-menu button:disabled {
+    cursor: not-allowed; color: var(--muted); background: transparent; border-color: transparent;
+  }
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 30; display: none; place-items: center;
+    padding: 24px; background: rgba(31, 42, 36, 0.32);
+  }
+  .modal-backdrop.open { display: grid; }
+  .modal {
+    width: min(900px, 100%); max-height: min(720px, 90vh); overflow: hidden;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(31, 42, 36, 0.2);
+  }
+  .modal-header {
+    display: flex; justify-content: space-between; gap: 12px; align-items: center;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }
+  .modal-title { margin: 0; color: var(--accent); font-size: 1rem; }
+  .modal-body { padding: 16px; overflow: auto; max-height: calc(min(720px, 90vh) - 58px); }
+  pre {
+    margin: 0; white-space: pre-wrap; word-break: break-word; color: var(--text);
+    background: var(--accent-tint); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; font-size: 0.78rem;
+  }
+  .history-list { display: grid; gap: 10px; }
+  .history-item { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .history-meta { color: var(--muted); font-size: 0.78rem; margin-bottom: 4px; }
+  .detail-section { display: grid; gap: 12px; }
+  .detail-section p { margin: 0; line-height: 1.5; }
+  .framework {
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+    background: var(--accent-tint);
+  }
+  .framework .label {
+    color: var(--muted); font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;
+  }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(4px); }
@@ -74,7 +130,7 @@
 </style>
 </head>
 <body>
-  <h1>Cloud Misconfiguration Scanner</h1>
+  <h1>LoudCloudProblems</h1>
   <p class="subtitle">Read-only S3 + IAM checks against Boto3-shaped JSON fixtures. No AWS credentials required for this demo.</p>
 
   <div class="controls">
@@ -91,6 +147,7 @@
       <option value="MEDIUM">Medium only</option>
       <option value="LOW">Low only</option>
     </select>
+    <input id="findingSearch" type="search" placeholder="Search findings" aria-label="Search findings">
     <button id="exportJson">Export JSON</button>
     <button id="exportCsv">Export CSV</button>
   </div>
@@ -98,10 +155,92 @@
   <div class="summary" id="summary"></div>
   <div id="results"></div>
 
+  <div class="context-menu" id="rowMenu" role="menu" aria-label="Resource actions">
+    <button id="viewConsole" title="Available in live-scan mode" disabled>View in AWS Console</button>
+    <button id="viewRaw">View raw source data</button>
+    <button id="viewHistory">History</button>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle"></h2>
+        <button id="closeModal" aria-label="Close dialog">Close</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
   <footer>Checks: S3 public policy/ACL, public access block, default encryption &middot; IAM admin wildcards, service wildcards, privilege escalation, public trust policies.</footer>
 
 <script>
 let currentFindings = [];
+let currentFixture = 'mixed-findings';
+let currentMode = 'fixture';
+let selectedFinding = null;
+
+const FINDING_DETAILS = {
+  S3_PUBLIC_POLICY_STATUS: {
+    explanation: 'AWS has evaluated the bucket policy as public. That means the bucket may allow access from outside the intended account or organization, which can expose objects, application data, backups, logs, or customer content depending on what the bucket stores.',
+    framework: 'CIS AWS Foundations Benchmark v1.4.0',
+    control: '2.1.2 / 2.1.3',
+    mapping: 'Related to controls requiring S3 buckets to prohibit public read and public write access.'
+  },
+  S3_PUBLIC_ACL: {
+    explanation: 'The bucket ACL grants access to a public AWS group such as AllUsers or AuthenticatedUsers. ACL-based public access is easy to miss because it can exist even when application code and bucket names look internal.',
+    framework: 'CIS AWS Foundations Benchmark v1.4.0',
+    control: '2.1.2 / 2.1.3',
+    mapping: 'Related to controls requiring S3 buckets to prohibit public read and public write access.'
+  },
+  S3_PUBLIC_POLICY: {
+    explanation: 'The bucket policy contains an Allow statement for a public principal. This can make objects reachable by anyone on the internet if the action and resource pattern include object access.',
+    framework: 'CIS AWS Foundations Benchmark v1.4.0',
+    control: '2.1.2 / 2.1.3',
+    mapping: 'Related to controls requiring S3 buckets to prohibit public read and public write access.'
+  },
+  S3_PUBLIC_ACCESS_BLOCK_DISABLED: {
+    explanation: 'One or more S3 Block Public Access settings are disabled or missing. These settings are important guardrails because they prevent accidental public ACLs and public bucket policies from taking effect.',
+    framework: 'CIS AWS Foundations Benchmark v1.4.0',
+    control: '2.1.1',
+    mapping: 'Related to the control requiring S3 Block Public Access to be enabled.'
+  },
+  S3_DEFAULT_ENCRYPTION_DISABLED: {
+    explanation: 'The bucket does not have default server-side encryption configured. New objects may be stored without encryption at rest unless every uploader remembers to request encryption explicitly.',
+    framework: 'CIS AWS Foundations Benchmark v1.4.0',
+    control: '2.1.4',
+    mapping: 'Related to the control requiring S3 buckets to have server-side encryption enabled.'
+  },
+  IAM_ADMIN_WILDCARD: {
+    explanation: 'An IAM policy grants every action on every resource. This is effectively administrator access and can allow data access, infrastructure changes, privilege escalation, and security control bypass.',
+    framework: 'CIS AWS Foundations Benchmark v1.4.0',
+    control: '1.16',
+    mapping: 'Related to the control requiring IAM policies not to allow full administrative privileges.'
+  },
+  IAM_BROAD_NOT_ACTION: {
+    explanation: 'The policy uses an Allow statement with NotAction and wildcard resources. This pattern can grant almost everything except a small excluded list, making the real permission boundary hard to reason about.',
+    framework: 'General cloud security best practice',
+    control: 'No precise control ID assigned',
+    mapping: 'Use least privilege and avoid broad negative permission patterns.'
+  },
+  IAM_SERVICE_WILDCARD: {
+    explanation: 'The policy grants wildcard access to a sensitive service on all resources. Even when it is not full administrator access, service-wide wildcards can expose data or allow changes across a large blast radius.',
+    framework: 'General cloud security best practice',
+    control: 'No precise control ID assigned',
+    mapping: 'Use least privilege with specific actions and resource ARNs.'
+  },
+  IAM_PRIVILEGE_ESCALATION: {
+    explanation: 'The policy allows actions commonly used to expand access, pass roles, create credentials, or deploy code. These permissions can become a path from limited access to broader control of the account.',
+    framework: 'General cloud security best practice',
+    control: 'No precise control ID assigned',
+    mapping: 'Review privilege-escalation paths and restrict high-risk IAM and deployment actions.'
+  },
+  IAM_PUBLIC_TRUST_POLICY: {
+    explanation: 'The role trust policy allows any principal to assume the role. If other conditions do not tightly constrain it, external identities may be able to request temporary credentials for that role.',
+    framework: 'General cloud security best practice',
+    control: 'No precise control ID assigned',
+    mapping: 'Restrict role trust policies to known accounts, roles, services, or federated identities.'
+  }
+};
 
 async function loadFixtures() {
   // fixtures already rendered server-side; nothing to do here.
@@ -109,6 +248,7 @@ async function loadFixtures() {
 
 async function runScan() {
   const fixture = document.getElementById('fixtureSelect').value;
+  currentFixture = fixture;
   const resultsEl = document.getElementById('results');
   resultsEl.innerHTML = '<div class="empty">Scanning...</div>';
   const res = await fetch(`/api/scan?fixture=${encodeURIComponent(fixture)}`);
@@ -118,6 +258,7 @@ async function runScan() {
     return;
   }
   currentFindings = data.findings;
+  currentMode = data.mode || 'fixture';
   renderSummary(data.summary);
   renderTable();
 }
@@ -136,7 +277,9 @@ function renderSummary(summary) {
 
 function renderTable() {
   const filter = document.getElementById('severityFilter').value;
-  const rows = filter === 'ALL' ? currentFindings : currentFindings.filter(f => f.severity === filter);
+  const searchTerm = document.getElementById('findingSearch').value.trim().toLowerCase();
+  const severityRows = filter === 'ALL' ? currentFindings : currentFindings.filter(f => f.severity === filter);
+  const rows = searchTerm ? severityRows.filter(f => searchableFindingText(f).includes(searchTerm)) : severityRows;
   const resultsEl = document.getElementById('results');
 
   if (rows.length === 0) {
@@ -151,21 +294,193 @@ function renderTable() {
         <tr><th>Severity</th><th>Service</th><th>Resource</th><th>Finding</th></tr>
       </thead>
       <tbody>
-        ${rows.map(f => `
-          <tr>
+        ${rows.map((f, index) => `
+          <tr class="resource-row" data-resource="${escapeHtml(f.resource)}" data-index="${index}" title="Right-click for resource actions">
             <td><span class="badge ${f.severity}">${f.severity}</span></td>
             <td>${f.service}</td>
-            <td class="resource">${f.resource}</td>
+            <td class="resource">${escapeHtml(f.resource)}</td>
             <td>
-              <div>${f.title}</div>
-              <div class="desc">${f.description}</div>
+              <div class="finding-line">
+                <div class="finding-copy">
+                  <div>${escapeHtml(f.title)}</div>
+                  <div class="desc">${escapeHtml(f.description)}</div>
+                </div>
+                <button class="info-btn" data-check-id="${escapeHtml(f.check_id)}" data-resource="${escapeHtml(f.resource)}" title="Explain this finding" aria-label="Explain ${escapeHtml(f.title)}">i</button>
+              </div>
             </td>
           </tr>
         `).join('')}
       </tbody>
     </table>
   `;
+  attachRowMenus(rows);
+  attachInfoButtons(rows);
   playFadeIn(resultsEl);
+}
+
+function attachInfoButtons(rows) {
+  document.querySelectorAll('.info-btn').forEach(button => {
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      const finding = rows.find(f => f.resource === button.dataset.resource && f.check_id === button.dataset.checkId);
+      if (finding) showFindingDetails(finding);
+    });
+  });
+}
+
+function attachRowMenus(rows) {
+  document.querySelectorAll('.resource-row').forEach(row => {
+    row.addEventListener('contextmenu', event => {
+      event.preventDefault();
+      const resource = row.dataset.resource;
+      selectedFinding = rows.find(f => f.resource === resource) || null;
+      document.querySelectorAll('.resource-row').forEach(item => item.classList.remove('selected'));
+      row.classList.add('selected');
+      openContextMenu(event.clientX, event.clientY);
+    });
+  });
+}
+
+function openContextMenu(x, y) {
+  const menu = document.getElementById('rowMenu');
+  const consoleButton = document.getElementById('viewConsole');
+  const consoleUrl = selectedFinding ? awsConsoleUrlForFinding(selectedFinding) : null;
+
+  if (currentMode === 'fixture' || !consoleUrl) {
+    consoleButton.disabled = true;
+    consoleButton.title = 'Available in live-scan mode';
+  } else {
+    consoleButton.disabled = false;
+    consoleButton.title = consoleUrl;
+  }
+
+  menu.classList.add('open');
+  const menuWidth = menu.offsetWidth;
+  const menuHeight = menu.offsetHeight;
+  menu.style.left = `${Math.min(x, window.innerWidth - menuWidth - 12)}px`;
+  menu.style.top = `${Math.min(y, window.innerHeight - menuHeight - 12)}px`;
+}
+
+function closeContextMenu() {
+  document.getElementById('rowMenu').classList.remove('open');
+}
+
+function awsConsoleUrlForFinding(finding) {
+  if (finding.resource.startsWith('s3://')) {
+    return `https://s3.console.aws.amazon.com/s3/buckets/${encodeURIComponent(finding.resource.replace('s3://', ''))}`;
+  }
+  if (finding.resource.startsWith('iam:role/')) {
+    return `https://console.aws.amazon.com/iam/home#/roles/details/${encodeURIComponent(finding.resource.replace('iam:role/', ''))}`;
+  }
+  if (finding.resource.startsWith('iam:user/')) {
+    return `https://console.aws.amazon.com/iam/home#/users/details/${encodeURIComponent(finding.resource.replace('iam:user/', ''))}`;
+  }
+  if (finding.resource.startsWith('iam:group/')) {
+    return `https://console.aws.amazon.com/iam/home#/groups/details/${encodeURIComponent(finding.resource.replace('iam:group/', ''))}`;
+  }
+  return null;
+}
+
+async function showRawSource() {
+  if (!selectedFinding) return;
+  closeContextMenu();
+  openModal('Raw Source Data', '<div class="empty">Loading raw source data...</div>');
+  const url = `/api/resource/raw?fixture=${encodeURIComponent(currentFixture)}&resource=${encodeURIComponent(selectedFinding.resource)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) {
+    openModal('Raw Source Data', `<div class="empty">${escapeHtml(data.error)}</div>`);
+    return;
+  }
+  openModal('Raw Source Data', `<pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>`);
+}
+
+async function showHistory() {
+  if (!selectedFinding) return;
+  closeContextMenu();
+  openModal('History', '<div class="empty">Loading history...</div>');
+  const res = await fetch(`/api/resource/history?resource=${encodeURIComponent(selectedFinding.resource)}`);
+  const data = await res.json();
+  if (data.error) {
+    openModal('History', `<div class="empty">${escapeHtml(data.error)}</div>`);
+    return;
+  }
+  if (!data.history || data.history.length === 0) {
+    openModal('History', '<div class="empty">No previous scan results for this resource yet.</div>');
+    return;
+  }
+  openModal('History', `
+    <div class="history-list">
+      ${data.history.map(item => `
+        <div class="history-item">
+          <div class="history-meta">${escapeHtml(formatTimestamp(item.scanned_at))} &middot; ${escapeHtml(item.fixture_id || item.mode)} &middot; run #${item.run_id}</div>
+          <div><span class="badge ${item.severity}">${escapeHtml(item.severity)}</span> ${escapeHtml(item.check_id)}</div>
+          <div class="desc">${escapeHtml(item.title)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `);
+}
+
+function showFindingDetails(finding) {
+  const details = FINDING_DETAILS[finding.check_id] || {
+    explanation: finding.description,
+    framework: 'General cloud security best practice',
+    control: 'No precise control ID assigned',
+    mapping: 'No specific framework mapping is assigned for this check.'
+  };
+  openModal('Finding Details', `
+    <div class="detail-section">
+      <div>
+        <div><span class="badge ${finding.severity}">${escapeHtml(finding.severity)}</span> ${escapeHtml(finding.check_id)}</div>
+        <p class="desc">${escapeHtml(finding.resource)}</p>
+      </div>
+      <p>${escapeHtml(details.explanation)}</p>
+      <div class="framework">
+        <div class="label">Framework Mapping</div>
+        <div><strong>${escapeHtml(details.framework)}</strong></div>
+        <div>${escapeHtml(details.control)}</div>
+        <p class="desc">${escapeHtml(details.mapping)}</p>
+      </div>
+    </div>
+  `);
+}
+
+function openModal(title, bodyHtml) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+}
+
+function formatTimestamp(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function searchableFindingText(finding) {
+  const details = FINDING_DETAILS[finding.check_id] || {};
+  return [
+    finding.title,
+    finding.description,
+    finding.check_id,
+    finding.resource,
+    finding.service,
+    finding.severity,
+    details.explanation,
+    details.framework,
+    details.control,
+    details.mapping
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
 }
 
 function playFadeIn(el) {
@@ -198,8 +513,27 @@ function downloadBlob(blob, filename) {
 
 document.getElementById('scanBtn').addEventListener('click', runScan);
 document.getElementById('severityFilter').addEventListener('change', renderTable);
+document.getElementById('findingSearch').addEventListener('input', renderTable);
 document.getElementById('exportJson').addEventListener('click', exportJson);
 document.getElementById('exportCsv').addEventListener('click', exportCsv);
+document.getElementById('viewConsole').addEventListener('click', () => {
+  if (!selectedFinding || currentMode === 'fixture') return;
+  const url = awsConsoleUrlForFinding(selectedFinding);
+  if (url) window.open(url, '_blank', 'noopener');
+});
+document.getElementById('viewRaw').addEventListener('click', showRawSource);
+document.getElementById('viewHistory').addEventListener('click', showHistory);
+document.getElementById('closeModal').addEventListener('click', closeModal);
+document.getElementById('modalBackdrop').addEventListener('click', event => {
+  if (event.target.id === 'modalBackdrop') closeModal();
+});
+document.addEventListener('click', closeContextMenu);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    closeContextMenu();
+    closeModal();
+  }
+});
 
 runScan();
 </script>

@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cloud-misconfig-scanner"
+name = "LoudCloudProblems"
 version = "0.1.0"
-description = "Read-only AWS cloud misconfiguration scanner for S3 and IAM."
+description = "Read-only AWS security scanner for S3 and IAM misconfigurations."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -18,7 +18,7 @@ dev = [
 ]
 
 [project.scripts]
-cloud-misconfig-scanner = "cloud_misconfig_scanner.cli:main"
+loudcloudproblems = "cloud_misconfig_scanner.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,3 +1,3 @@
-"""Cloud Misconfiguration Scanner package."""
+"""LoudCloudProblems scanner package."""
 
 __version__ = "0.1.0"

@@ -5,3 +5,7 @@ dashboard/.venv/
 *.egg-info/
 dashboard_run.log*
 .claude/settings.local.json
+dashboard/.data/
+build/
+dist/
+*.spec

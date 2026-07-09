@@ -1,6 +1,7 @@
+# LoudCloudProblems
+
 Render Link: https://dashboard.render.com/web/srv-d97q9c7aqgkc73f0jbgg/deploys/dep-d97q9cvaqgkc73f0jck0?r=2026-07-09%4013%3A39%3A03%7E2026-07-09%4013%3A42%3A06
 Direct Tool Link: https://cloud-misconfig-scanner.onrender.com/
-# Cloud Misconfiguration Scanner
 
 An advanced, read-only AWS security automation project that uses Boto3-style API responses to detect high-value cloud misconfigurations:
 
@@ -9,7 +10,7 @@ An advanced, read-only AWS security automation project that uses Boto3-style API
 - Weak IAM identity policies
 - Public IAM role trust policies
 
-The scanner is designed around JSON-heavy AWS responses. The detection logic is separated from Boto3 clients, so it can run against a real AWS account or against a local fixture for safe testing and demos.
+LoudCloudProblems is designed around JSON-heavy AWS responses. The detection logic is separated from Boto3 clients, so it can run against a real AWS account or against a local fixture for safe testing and demos.
 
 ## Live Demo
 
