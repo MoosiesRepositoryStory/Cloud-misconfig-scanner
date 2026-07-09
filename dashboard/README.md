@@ -7,6 +7,7 @@ This is a demo app. It only reads local JSON fixtures under `fixtures/`, so it i
 ## What's included
 
 - `app.py` - Flask app that adds `../src` to `sys.path` and imports `scan_s3`, `scan_iam`, and `load_fixture_clients` directly from the scanner package in this repo.
+- `desktop.py` - runs `app.py`'s Flask server in a background thread and opens it in a native PyWebView window, so the dashboard launches as a standalone desktop app instead of requiring a browser.
 - `fixtures/`
   - `clean-account.json` - a properly configured account. Expect 0 findings.
   - `mixed-findings.json` - the original sample from the scanner README. Expect 8 findings.
@@ -25,6 +26,8 @@ python dashboard/app.py
 ```
 
 Then open http://127.0.0.1:5050. Pick a fixture from the dropdown, click **Run Scan**, filter by severity, and export the findings as JSON or CSV.
+
+Run `python dashboard/desktop.py` for the desktop app, or `python dashboard/app.py` + open browser for web mode.
 
 You can also call the API directly:
 

@@ -6,43 +6,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
+    /* Severity colors are functional, not decorative — left untouched by the theme. */
     --crit: #dc2626; --high: #ea580c; --med: #ca8a04; --low: #65a30d;
-    --bg: #0f172a; --panel: #1e293b; --border: #334155; --text: #e2e8f0; --muted: #94a3b8;
+
+    /* Theme: white background, dark green accent. */
+    --accent: #1b4332; --accent-hover: #143026; --accent-tint: #eef4f1;
+    --bg: #fafafa; --panel: #ffffff; --border: #e2e5e3; --text: #1f2a24; --muted: #6b7770;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif;
     background: var(--bg); color: var(--text); padding: 24px;
   }
-  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; color: var(--accent); }
   .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 0.9rem; }
   .controls {
     display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;
+    padding-bottom: 16px; border-bottom: 1px solid var(--border);
   }
   select, button {
     background: var(--panel); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 8px 12px; font-size: 0.9rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   }
+  select:hover, select:focus { border-color: var(--accent); outline: none; }
+  select:focus { box-shadow: 0 0 0 3px var(--accent-tint); }
   button { cursor: pointer; }
-  button.primary { background: #2563eb; border-color: #2563eb; font-weight: 600; }
-  button.primary:hover { background: #1d4ed8; }
-  button:hover { background: #334155; }
+  button:hover { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
   .summary { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px 18px; min-width: 110px;
+    padding: 12px 18px; min-width: 110px; transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
+  .card:hover { border-color: var(--accent); box-shadow: 0 1px 6px rgba(27, 67, 50, 0.08); }
   .card .n { font-size: 1.6rem; font-weight: 700; }
   .card .l { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
   .card.CRITICAL .n { color: var(--crit); }
   .card.HIGH .n { color: var(--high); }
   .card.MEDIUM .n { color: var(--med); }
   .card.LOW .n { color: var(--low); }
-  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+  th { color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; background: var(--accent-tint); }
   tr:last-child td { border-bottom: none; }
-  tr:hover { background: #24304a; }
+  tr { transition: background-color 0.12s ease; }
+  tr:hover { background: var(--accent-tint); }
   .badge {
     display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem;
     font-weight: 700; color: #fff;
@@ -55,6 +65,12 @@
   .desc { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
   .resource { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   footer { margin-top: 24px; color: var(--muted); font-size: 0.75rem; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fadeIn 0.35s ease; }
 </style>
 </head>
 <body>
@@ -115,6 +131,7 @@ function renderSummary(summary) {
       <div class="l">${sev}</div>
     </div>
   `).join('');
+  playFadeIn(el);
 }
 
 function renderTable() {
@@ -124,6 +141,7 @@ function renderTable() {
 
   if (rows.length === 0) {
     resultsEl.innerHTML = '<div class="empty">No findings for this filter. 🎉</div>';
+    playFadeIn(resultsEl);
     return;
   }
 
@@ -147,6 +165,13 @@ function renderTable() {
       </tbody>
     </table>
   `;
+  playFadeIn(resultsEl);
+}
+
+function playFadeIn(el) {
+  el.classList.remove('fade-in');
+  void el.offsetWidth; // restart the animation on repeated scans
+  el.classList.add('fade-in');
 }
 
 function exportJson() {

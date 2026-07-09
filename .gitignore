@@ -3,3 +3,5 @@ __pycache__/
 dashboard/.venv/
 *.pyc
 *.egg-info/
+dashboard_run.log*
+.claude/settings.local.json
