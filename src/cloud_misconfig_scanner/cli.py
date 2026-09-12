@@ -14,7 +14,7 @@ from .s3 import scan_s3
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="loudcloudproblems",
+        prog="cloud-misconfig-scanner",
         description="Read-only AWS security scanner for S3 and IAM misconfigurations.",
     )
     parser.add_argument("--profile", help="AWS profile name for live Boto3 scans.")

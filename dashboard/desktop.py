@@ -1,5 +1,5 @@
 """
-LoudCloudProblems - Desktop App
+Cloud Misconfiguration Scanner - Desktop App
 ----------------------------------------------
 Wraps the Flask dashboard (app.py) in a native PyWebView window so it can be
 launched as a standalone desktop app instead of requiring a browser.
@@ -98,8 +98,8 @@ SPLASH_HTML = """
 </style>
 </head>
 <body>
-  <main class="splash" aria-label="Launching LoudCloudProblems">
-    <h1 class="wordmark">LoudCloudProblems</h1>
+  <main class="splash" aria-label="Launching Cloud Misconfiguration Scanner">
+    <h1 class="wordmark">Cloud Misconfiguration Scanner</h1>
     <p class="subtitle">Preparing S3 and IAM findings dashboard</p>
     <div class="bar" aria-hidden="true"></div>
   </main>
@@ -147,7 +147,7 @@ def smoke_test() -> int:
         print("Expected bundled favicon.ico to be served, but response was too small.")
         return 1
 
-    print(f"LoudCloudProblems smoke test passed with {finding_count} findings and favicon.ico.")
+    print(f"Cloud Misconfiguration Scanner smoke test passed with {finding_count} findings and favicon.ico.")
     return 0
 
 
@@ -160,14 +160,14 @@ def main() -> None:
     _wait_for_server()
 
     splash_window = webview.create_window(
-        "LoudCloudProblems",
+        "Cloud Misconfiguration Scanner",
         html=SPLASH_HTML,
         width=560,
         height=360,
         resizable=True,
     )
     dashboard_window = webview.create_window(
-        "LoudCloudProblems",
+        "Cloud Misconfiguration Scanner",
         f"http://{HOST}:{PORT}",
         width=1280,
         height=800,

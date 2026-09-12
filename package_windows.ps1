@@ -4,9 +4,9 @@ $ErrorActionPreference = "Stop"
   --noconfirm `
   --clean `
   --onefile `
-  --name LoudCloudProblems `
+  --name CloudMisconfigScanner `
   --paths src `
-  --icon "dashboard\static\loudcloudproblems.ico" `
+  --icon "dashboard\static\cloud-misconfig-scanner.ico" `
   --add-data "dashboard\templates;dashboard\templates" `
   --add-data "dashboard\fixtures;dashboard\fixtures" `
   --add-data "dashboard\static;dashboard\static" `

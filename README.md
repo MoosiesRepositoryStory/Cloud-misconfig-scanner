@@ -1,51 +1,59 @@
-# LoudCloudProblems
+# Cloud Misconfiguration Scanner
 
-Render Link: https://dashboard.render.com/web/srv-d97q9c7aqgkc73f0jbgg/deploys/dep-d97q9cvaqgkc73f0jck0?r=2026-07-09%4013%3A39%3A03%7E2026-07-09%4013%3A42%3A06
-Direct Tool Link: https://cloud-misconfig-scanner.onrender.com/
+A read-only AWS security scanner that detects high-value S3 and IAM
+misconfigurations from Boto3-shaped JSON responses — runs against a real
+AWS account or a local fixture, so it's safe to demo without credentials.
 
-An advanced, read-only AWS security automation project that uses Boto3-style API responses to detect high-value cloud misconfigurations:
+**Live demo:** [cloud-misconfig-scanner.onrender.com](https://cloud-misconfig-scanner.onrender.com/)
+(runs entirely against local fixtures — no AWS credentials, no network calls)
 
-- Public S3 buckets
+## What it detects
+
+- Public S3 buckets (via ACL, bucket policy, or `PublicAccessBlock` status)
 - S3 buckets without default server-side encryption
-- Weak IAM identity policies
+- Overprivileged IAM policies (wildcard actions/resources, broad `NotAction`,
+  privilege-escalation-prone service grants)
 - Public IAM role trust policies
 
-LoudCloudProblems is designed around JSON-heavy AWS responses. The detection logic is separated from Boto3 clients, so it can run against a real AWS account or against a local fixture for safe testing and demos.
+Detection logic is separated from the Boto3 client, so the same checks run
+identically against a real account or a fixture file — useful for CI and for
+safe demos alike.
 
-## Live Demo
+## Quick start
 
-Run the Flask dashboard in `dashboard/` to scan local fixtures and view S3/IAM findings in a browser severity dashboard.
-
-## Quick Start
-
-```powershell
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+source .venv/bin/activate   # .venv\Scripts\Activate.ps1 on Windows
 pip install -e ".[dev]"
 ```
 
-Run against the included sample AWS response fixture:
+Run against the included sample fixture:
 
-```powershell
+```bash
 python -m cloud_misconfig_scanner --fixture examples/aws_responses.sample.json --format table
 python -m cloud_misconfig_scanner --fixture examples/aws_responses.sample.json --format json
 ```
 
-Run against AWS with your configured credentials:
+Run against a real AWS account with your configured credentials:
 
-```powershell
+```bash
 python -m cloud_misconfig_scanner --profile prod-readonly --region us-east-1
 ```
 
 Fail CI if high-risk findings are present:
 
-```powershell
+```bash
 python -m cloud_misconfig_scanner --profile prod-readonly --fail-on HIGH
 ```
 
-## Required AWS Permissions
+There's also a browser dashboard — see [`dashboard/README.md`](dashboard/README.md)
+for a filterable findings table with JSON/CSV export, runnable as a web app
+or a standalone desktop app (PyWebView).
 
-Use a read-only principal. The scanner needs these permissions for the implemented checks:
+## Required AWS permissions
+
+Use a read-only principal. The scanner needs these permissions for the
+implemented checks:
 
 ```json
 {
@@ -99,11 +107,14 @@ Use a read-only principal. The scanner needs these permissions for the implement
 
 ## Development
 
-Run the tests:
-
-```powershell
-$env:PYTHONPATH = "src"
-python -m unittest discover -s tests
+```bash
+PYTHONPATH=src python -m unittest discover -s tests
 ```
 
-The project avoids network access in tests by using fake clients and fixture clients that mimic the subset of AWS JSON responses the scanner consumes.
+Tests avoid network access entirely, using fake and fixture-backed clients
+that mimic the subset of AWS JSON responses the scanner consumes.
+
+## Windows packaging
+
+`package_windows.ps1` bundles the desktop dashboard into a standalone
+`.exe` via PyInstaller, for distribution without a Python install.

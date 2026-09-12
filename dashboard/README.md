@@ -1,6 +1,6 @@
-# LoudCloudProblems - Dashboard
+# Cloud Misconfiguration Scanner - Dashboard
 
-A browser dashboard for the LoudCloudProblems CLI. It runs the same S3 and IAM detection logic from `../src/cloud_misconfig_scanner` against Boto3-shaped JSON fixtures, then shows the findings in a filterable table with severity summary cards.
+A browser dashboard for the Cloud Misconfiguration Scanner CLI. It runs the same S3 and IAM detection logic from `../src/cloud_misconfig_scanner` against Boto3-shaped JSON fixtures, then shows the findings in a filterable table with severity summary cards.
 
 This is a demo app. It only reads local JSON fixtures under `fixtures/`, so it is safe to run and screen-record without AWS credentials or network calls.
 

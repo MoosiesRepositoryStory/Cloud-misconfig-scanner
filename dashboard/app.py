@@ -1,5 +1,5 @@
 """
-LoudCloudProblems - Dashboard
+Cloud Misconfiguration Scanner - Dashboard
 --------------------------------------------
 A small Flask app that wraps the cloud_misconfig_scanner package (S3 + IAM
 checks against Boto3-shaped JSON) in a browser dashboard.
@@ -27,7 +27,7 @@ RESOURCE_DIR = BUNDLE_DIR / "dashboard" if (BUNDLE_DIR / "dashboard").exists() e
 FIXTURES_DIR = RESOURCE_DIR / "fixtures"
 TEMPLATES_DIR = RESOURCE_DIR / "templates"
 STATIC_DIR = RESOURCE_DIR / "static"
-DATA_DIR = Path.home() / ".loudcloudproblems"
+DATA_DIR = Path.home() / ".cloud-misconfig-scanner"
 HISTORY_DB = DATA_DIR / "scan_history.sqlite3"
 
 # Make the repo-local cloud_misconfig_scanner package importable.
@@ -251,7 +251,7 @@ def index():
 
 @app.get("/favicon.ico")
 def favicon():
-    return send_from_directory(STATIC_DIR, "loudcloudproblems.ico", mimetype="image/x-icon")
+    return send_from_directory(STATIC_DIR, "cloud-misconfig-scanner.ico", mimetype="image/x-icon")
 
 
 @app.route("/api/fixtures")
